@@ -1,0 +1,170 @@
+#!/bin/bash
+# Launch Grafana on a single instance cluster in AWS ECS
+# Requires AWS CLI package. See https://aws.amazon.com/cli/
+# AWS CLI must be configured with credentials for this script to run.
+# Default region is ap-northeast-2
+
+# Set basic environment
+THIS=`basename $0`
+NOW=`date +%y%m%d%H%M%S`
+
+# Set a usage message
+usage_msg(){
+	printf "\nUsage: $THIS <options>\n"
+	printf "All options are optional. Options include:\n"
+	printf "\n\t-d\t\t\t Debug ON. Very Verbose Output."
+	printf "\n\t-n\t\t\t Don't Run. Print settings and quit."
+	printf "\n\t--cluster-name <name>\t\t Set Cluster Name"
+	printf "\n\t--role-name <name>\t\t Set IAM Role Name"
+	printf "\n\t--instance-profile <name>\t Set Instance Profile Name"
+	printf "\n\t--task-family <name>\t\t Set ECS Task Family Name"
+	printf "\n\t--task-name <name>\t\t Set ECS Task Name"
+	printf "\n\t--task-image <image>\t\t Docker registry location of task image (default is grafana/grafana)"
+	printf "\n\t--task-memory <size>\t\t Amount of Task Memory to register, in MB (default is 256)"
+	printf "\n\t--container-port <port>\t Port on container to access service (default is 3000)"
+	printf "\n\t--service-name <name>\t\t Name of ECS Service to run Task definition"
+	printf "\n\t--security-group <name>\t Name of Security Group"
+	printf "\n\t--region <name>\t\t AWS Region to launch in. (default is ap-northeast-2)"
+	printf "\n\n"
+	printf "AWS CLI tools must be installed and configured with appropriate credentials & region settings for this script to run.\n"
+		
+}
+
+# Clear any previously set variables except AWS_REGION
+unset ECS_CLUSTER_NAME ECS_ROLE NAME ECS_INSTANCE_PROFILE ECS_TASK_FAMILY ECS_TASK_NAME ECS_TASK_IMAGE ECS_TASK_MEMORY ECS_CONTAINER_PORT ECS_SERVICE_NAME
+
+# Gather options from the command line
+while [ $# -gt 0 ]; do
+	case $1 in
+		-d)					DBG=1; shift 1;;
+		-n)					NORUN=1; shift 1;;
+		--cluster-name) 	ECS_CLUSTER_NAME=$2; shift 2;;
+		--role-name) 		ECS_ROLE_NAME=$2; shift 2;;
+		--instance-profile) ECS_INSTANCE_PROFILE=$2; shift 2;;
+		--task-family)	    ECS_TASK_FAMILY=$2; shift 2;;
+		--task-name)		ECS_TASK_NAME=$2; shift 2;;
+		--task-image)		ECS_TASK_IMAGE=$2; shift 2;;
+		--task-memory)		ECS_TASK_MEMORY=$2; shift 2;;
+		--container-port)	ECS_CONTAINER_PORT=$2; shift 2;;
+		--service-name)		ECS_SERVICE_NAME=$2; shift 2;;
+		--security-group)	SECURITY_GROUP_NAME=$2; shift 2;;
+		--region)			AWS_REGION=$2; shift 2;;		
+		*)					usage_msg; exit 0;;
+	esac
+done
+
+# Set defaults for any variables not specified on the command line
+[[ ! $ECS_CLUSTER_NAME ]] && ECS_CLUSTER_NAME="demoCluster-$NOW"
+[[ ! $ECS_ROLE_NAME ]] && ECS_ROLE_NAME="demoEcsRole-$NOW"
+[[ ! $ECS_INSTANCE_PROFILE ]] && ECS_INSTANCE_PROFILE="demoEcsInstanceProfile-$NOW"
+
+[[ ! $ECS_TASK_FAMILY ]] && ECS_TASK_FAMILY="demoGrafanaTasks-$NOW"
+[[ ! $ECS_TASK_NAME ]] && ECS_TASK_NAME="demoGrafana-$NOW"
+[[ ! $ECS_TASK_IMAGE ]] && ECS_TASK_IMAGE="grafana/grafana"
+[[ ! $ECS_TASK_MEMORY ]] && ECS_TASK_MEMORY=256
+[[ ! $ECS_CONTAINER_PORT ]] && ECS_CONTAINER_PORT=3000
+
+[[ ! $ECS_SERVICE_NAME ]] && ECS_SERVICE_NAME="demoGrafanaService-$NOW"
+
+[[ ! $SECURITY_GROUP_NAME ]] && SECURITY_GROUP_NAME="demoGrafanaSG-$NOW"
+[[ ! $AWS_REGION ]] && AWS_REGION="ap-northeast-2"
+
+print_settings(){
+
+	echo ECS_CLUSTER_NAME=$ECS_CLUSTER_NAME
+	echo ECS_ROLE_NAME=$ECS_ROLE_NAME
+	echo ECS_INSTANCE_PROFILE=$ECS_INSTANCE_PROFILE
+	echo ECS_TASK_FAMILY=$ECS_TASK_FAMILY
+	echo ECS_TASK_NAME=$ECS_TASK_NAME
+	echo ECS_TASK_MEMORY=$ECS_TASK_MEMORY
+	echo ECS_CONTAINER_PORT=$ECS_CONTAINER_PORT
+	echo ECS_SERVICE_NAME=$ECS_SERVICE_NAME
+	echo SECURITY_GROUP_NAME=$SECURITY_GROUP_NAME
+	echo AWS_REGION=$AWS_REGION
+
+}
+
+# Get ECS AMI by region
+case $AWS_REGION in
+	us-east-2)	AMI_ID="ami-58f5db3d";;
+	us-east-1)	AMI_ID="ami-fad25980";;
+	us-west-2)	AMI_ID="ami-7114c909";;
+	us-west-1)	AMI_ID="ami-62e0d802";;
+	eu-west-3)	AMI_ID="ami-d179ceac";;
+	eu-west-2)	AMI_ID="ami-dbfee1bf";;
+	eu-west-1)	AMI_ID="ami-4cbe0935";;
+	eu-central-1)	AMI_ID="ami-05991b6a";;
+	ap-northeast-2)	AMI_ID="ami-7267c01c";;
+	ap-northeast-1)	AMI_ID="ami-56bd0030";;
+	ap-southeast-2)	AMI_ID="ami-14b55f76";;
+	ap-southeast-1)	AMI_ID="ami-1bdc8b78";;
+	ca-central-1)	AMI_ID="ami-918b30f5";;
+	ap-south-1)	AMI_ID="ami-e4d29c8b";;
+	sa-east-1)	AMI_ID="ami-d596d2b9";;
+	*)	echo "The region you specified is not currently available for this script."; exit 1;;
+esac
+
+
+[[ $NORUN || $DBG ]] && print_settings
+[[ $NORUN || $DBG ]] && echo AMI_ID=$AMI_ID
+[[ $NORUN ]] && exit 0
+
+# Create cluster
+[[ $DBG ]] && printf "Creating ECS Cluster $ECS_CLUSTER_NAME...\n"
+aws --region=$AWS_REGION ecs create-cluster --cluster-name $ECS_CLUSTER_NAME
+ 
+# Create role
+[[ $DBG ]] && printf "Creating IAM Role $ECS_ROLE_NAME...\n"
+aws --region=$AWS_REGION iam create-role --role-name $ECS_ROLE_NAME --assume-role-policy-document '{"Version": "2012-10-17", "Statement": {"Effect": "Allow", "Principal": {"Service": "ec2.amazonaws.com"}, "Action": "sts:AssumeRole"}}'
+
+# Attach Role Policy
+[[ $DBG ]] && printf "Attaching Container Service Role Policy to $ECS_ROLE_NAME...\n" 	  
+aws --region=$AWS_REGION iam attach-role-policy --role-name $ECS_ROLE_NAME --policy-arn "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"
+
+# Create Instance Profile
+[[ $DBG ]] && printf "Creating Instance Profile $ECS_INSTANCE_PROFILE...\n"
+aws --region=$AWS_REGION iam create-instance-profile --instance-profile-name $ECS_INSTANCE_PROFILE
+
+# Add Role to Instance Profile
+[[ $DBG ]] && printf "Adding Role $ECS_ROLE_NAME to Instance Profile $ECS_INSTANCE_PROFILE...\n"
+aws --region=$AWS_REGION iam add-role-to-instance-profile --instance-profile-name $ECS_INSTANCE_PROFILE --role-name $ECS_ROLE_NAME
+
+[[ $DBG ]] && printf "Waiting for Role to update...\n"
+sleep 15
+ 
+# Create Task Definition
+[[ $DBG ]] && printf "Creating Task Definition $ECS_TASK_NAME in $ECS_TASK_FAMILY...\n"
+TASK_DEFINITION_ID=`aws --region=$AWS_REGION ecs register-task-definition --family $ECS_TASK_FAMILY --query taskDefinition.taskDefinitionArn --output text --container-definitions \
+'[{
+      "name": "'$ECS_TASK_NAME'", 
+      "image": "'$ECS_TASK_IMAGE'", 
+      "memoryReservation": '$ECS_TASK_MEMORY', 
+      "portMappings": [{"containerPort": '$ECS_CONTAINER_PORT', "hostPort": 80}]}]'`
+
+# Create Security Group & Get its resource ID
+[[ $DBG ]] && printf "Creating Security Group $SECURITY_GROUP_NAME...\n"	  
+SECURITY_GROUP_ID=`aws --region=$AWS_REGION ec2 create-security-group --group-name $SECURITY_GROUP_NAME --description "Demo Security Group for Demo Grafana" --query GroupId --output text`
+
+# Add Ingress Rules to Security Group
+[[ $DBG ]] && printf "Adding Ingress Rules to Security Group...\n"
+aws --region=$AWS_REGION ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID --protocol tcp --port 80 --cidr "0.0.0.0/0"
+
+# Create instance and associate it with ECS Cluster
+[[ $DBG ]] && printf "Creating EC2 Instance & Associating it with ECS Cluster $ECS_CLUSTER_NAME...\n" 
+INSTANCE_ID=`aws --region=$AWS_REGION ec2 run-instances --security-groups $SECURITY_GROUP_NAME --image-id $AMI_ID --iam-instance-profile "Name=$ECS_INSTANCE_PROFILE" --user-data '
+#!/bin/bash 
+echo ECS_CLUSTER='$ECS_CLUSTER_NAME' >> /etc/ecs/ecs.config' \
+	--query "Instances[0].InstanceId" --output text`
+
+# Wait for instances to launch
+[[ $DBG ]] && printf "Waiting for instance $INSTANCE_ID to launch...\n"
+aws --region=$AWS_REGION ec2 wait instance-status-ok --instance-ids $INSTANCE_ID
+ 
+# Start Grafana Service
+[[ $DBG ]] && printf "Starting Service $ECS_SERVICE_NAME...\n"
+aws --region=$AWS_REGION ecs create-service --cluster $ECS_CLUSTER_NAME --service-name $ECS_SERVICE_NAME --task-definition $ECS_TASK_FAMILY --desired-count 1
+
+[[ $DBG ]] && printf "Getting Public DNS of Instance $INSTANCE_ID...\n"
+aws --region=$AWS_REGION ec2 describe-instances --instance-ids $INSTANCE_ID --query 'Reservations[].Instances[].PublicDnsName'
+
+exit 0
