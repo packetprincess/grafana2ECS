@@ -35,6 +35,7 @@ This script is intended as a demo to be customized for your application. To use,
 
 Usage: demoGrafanaDashboard.sh <options>
 Options (all are optional, order invariant):
+	
 	-d				Debug Mode. Verbose output.
 	-h				Help. This message.
 	--dns <name>			Service DNS Name.
