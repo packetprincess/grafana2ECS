@@ -423,15 +423,6 @@ print_template(){
 	print_dash2
 	print_footer
 }
-#print_template > $DASH_FILE_NAME
-
-print_alt_template(){
-	cat demoGrafanaDashboard.json
-}
-
-
-print_alt_template > $DASH_FILE_NAME
-
-
+print_template > $DASH_FILE_NAME
 
 exit 0
