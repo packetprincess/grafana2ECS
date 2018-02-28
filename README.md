@@ -27,3 +27,24 @@ All options are optional. Options include:
 
 
 In truth, this script should be able to launch any public Docker image into ECS by setting the appropriate options on the command line. It is currently configured for Grafana by default, and alternative images have not been tested. Use at your own risk. :)
+
+## demoGrafanaDashboard.sh
+A script to generate a Grafana dashboard for AWS resources. Takes either environment variables, command-line arguments, or defaults specified in the script as input. Sample dashboard code is included.
+
+This script is intended as a demo to be customized for your application. To use, create and configure a dashboard for your resources in Grafana, and replace the dashboard outputs with your custom dashboard JSON, parameterized for your resources.  Append to deployment process to auto-update dashboard as resource IDs change.  Demo options below.
+
+Usage: demoGrafanaDashboard.sh <options>
+Options (all are optional, order invariant):
+	-d				Debug Mode. Verbose output.
+	-h				Help. This message.
+	--dns <name>			Service DNS Name.
+	--dash-file <name>		Output path for dashboard. Defaults to DNS Name.
+	--title "<name>"		Set the dashboard title. Uses DNS Name if specified, otherwise defaults to demoDashboard.
+	--aws-region <name>		Set AWS Region.
+	--data-source "<name>"		CloudWatch Data Source Name
+	--asg <resource id>		For monitoring ASG Stats.
+	--elb <resource id>		For monitoring Requests & Latency.
+	--ec2 <instance id>		For monitoring EC2 machine stats.
+	--ecs <cluster name>		For monitoring ECS stats.
+	--db-source "<name>"		Database Data Source Name
+	--cp-test <test id>		Catchpoint Test ID.
