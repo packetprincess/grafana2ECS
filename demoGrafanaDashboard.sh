@@ -12,7 +12,7 @@ set_environment()
 # Command line options override environment vars.
 # Defaults in case neither are set:
 {	
-	[[ $DNSNAME ]] || DNSNAME="ec2-13-125-118-71.ap-northeast-2.compute.amazonaws.com"
+	[[ $DNSNAME ]] || DNSNAME="ec2-xxxxxxxx.ap-northeast-2.compute.amazonaws.com"
 	[[ $DASH_PATH ]] || DASH_PATH=$HERE/dashboards/
 	[[ $DASH_FILE_NAME ]] || DASH_FILE_NAME=${DASH_PATH}$DNSNAME		
 	[[ $DASH_TITLE ]] || DASH_TITLE="demoDashboard"
@@ -33,23 +33,20 @@ set_environment()
 # Usage Message
 usage_msg(){
 	printf "Usage: $THIS <options>\n"
-	printf "Options (all are optional, order invariant):"
-	printf "-d\tDebug Mode. Verbose output.\n"
-	printf "-h\tHelp. This message.\n"
-	
-	printf "-D DNSName\tService DNS Name.\n"
-	printf "-f DashboardFileName\tOutput path for dashboard. Defaults to DNS Name.\n"
-	printf "-T \"Dashboard Title\"\tSet the dashboard title. Uses DNS Name if specified, otherwise defaults to demoDashboard.\n"
-	
-	printf "-R AWS_Region\tSet AWS Region.\n"
-	printf "-DS \"DataSource\"\tCloudWatch Data Source Name\n"
-	printf "-A AutoScaling Group\tFor monitoring ASG Stats.\n"
-	printf "-L LoadBalancer\tFor monitoring Requests & Latency.\n"
-	printf "-I InstanceID\tFor monitoring EC2 machine stats.\n"
-	printf "-E ECSClusterName\tFor monitoring ECS stats.\n"
-	
-	printf "-DB \"DB DS Name\"\tDatabase Data Source Name\n"
-	printf "-C CatchpointID\tCatchpoint Test ID.\n"
+	printf "Options (all are optional, order invariant):\n"
+	printf "\t-d\t\t\t\tDebug Mode. Verbose output.\n"
+	printf "\t-h\t\t\t\tHelp. This message.\n"
+	printf "\t--dns <name>\t\t\tService DNS Name.\n"
+	printf "\t--dash-file <name>\t\tOutput path for dashboard. Defaults to DNS Name.\n"
+	printf "\t--title \"<name>\"\t\t\tSet the dashboard title. Uses DNS Name if specified, otherwise defaults to demoDashboard.\n"
+	printf "\t--aws-region <name>\t\tSet AWS Region.\n"
+	printf "\t--data-source "<name>"\t\tCloudWatch Data Source Name.\n"
+	printf "\t--asg <resource id>\t\tFor monitoring ASG Stats.\n"
+	printf "\t--elb <resource id>\t\tFor monitoring Requests & Latency.\n"
+	printf "\t--ec2 <instance id>\t\tFor monitoring EC2 machine stats.\n"
+	printf "\t--ecs <cluster name>\t\tFor monitoring ECS stats.\n"
+	printf "\t--db-source \"<name>\"\t\tDatabase Data Source Name.\n"
+	printf "\t--cp-test <test id>\t\tCatchpoint Test ID.\n"
 	exit 0
 }
 
@@ -57,20 +54,20 @@ usage_msg(){
 while [[ $# -gt 0 ]]; do
 	case $1 in
 		-d) DBG=1; shift 1;;
-		-D) DNSNAME=$2; shift 2;;
-		-p) DASH_PATH=$2; shift 2;;
-		-f) DASH_FILE_NAME=$2; shift 2;;		
-		-T) DASH_TITLE=$2; shift 2;;
+		--dns) DNSNAME=$2; shift 2;;
+		--dash-path) DASH_PATH=$2; shift 2;;
+		--dash-file) DASH_FILE_NAME=$2; shift 2;;		
+		--title) DASH_TITLE=$2; shift 2;;
 
-		-R) AWSREGION=$2; shift 2;;
-		-DS) DATA_SOURCE=$2; shift 2;;
-		-A) AUTOSCALING_GROUP=$2; shift 2;;
-		-L) LOADBALANCER=$2; shift 2;;
-		-I) INSTANCE_ID=$2; shift 2;;
-		-E) ECS_CLUSTER_NAME=$2; shift 2;;
+		--aws-region) AWSREGION=$2; shift 2;;
+		--data-source) DATA_SOURCE=$2; shift 2;;
+		--asg) AUTOSCALING_GROUP=$2; shift 2;;
+		--elb) LOADBALANCER=$2; shift 2;;
+		--ec2) INSTANCE_ID=$2; shift 2;;
+		--ecs) ECS_CLUSTER_NAME=$2; shift 2;;
 		
-		-DB) DB_DS_NAME=$2; shift 2;;
-		-C) CP_TEST_ID=$2; shift 2;;
+		--db-source) DB_DS_NAME=$2; shift 2;;
+		--cp-test) CP_TEST_ID=$2; shift 2;;
 		
 		*) usage_msg;;
 	esac	
